@@ -9,7 +9,7 @@ app.use(express.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(require("./routes/values"));
 app.use(require("./routes/utilities"));
-// app.use(require("./routes/turnservertoken"));
+app.use(require("./routes/turnservertoken"));
 app.use(require("./routes/rooms"));
 // get driver connection
 const dbo = require("./db/conn");
