@@ -1,23 +1,16 @@
 const express = require("express");
+const { google } = require('googleapis');
 const nodemailer = require("nodemailer");
-const htmlToText = require('nodemailer-html-to-text').htmlToText;
  
-// utilityRoutes is an instance of the express router.
-// We use it to define our routes.
-// The router will be added as a middleware and will take control of requests starting with path /utilities.
-const utilityRoutes = express.Router();
- 
-// This will help us connect to the database
-const dbo = require("../db/conn");
- 
-// This help convert the id from string to ObjectId for the _id.
-const ObjectId = require("mongodb").ObjectId;
+const GMAIL_CLIENT_ID = process.env.GMAIL_CLIENT_ID;
+const GMAIL_CLIENT_SECRET = process.env.GMAIL_CLIENT_SECRET;
+const GMAIL_REDIRECT_URI = process.env.GMAIL_REDIRECT_URI;
+const GMAIL_REFRESH_TOKEN = process.env.GMAIL_REFRESH_TOKEN;
 
-const smtpAddress = "smtppro.zoho.in";
-const portNumber = 465;
-// const enableSSL = true;
-const enableTLS = true;
-const emailFromAddress = "umeshpanchal@zohomail.in";
+const oAuth2Client = new google.auth.OAuth2(GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REDIRECT_URI);
+oAuth2Client.setCredentials({refresh_token: GMAIL_REFRESH_TOKEN});
+
+const utilityRoutes = express.Router();
 
 utilityRoutes.route("/api/Utilities/SendEmail").post(async function (req, res) {
   let emailBody = "";
@@ -27,7 +20,12 @@ utilityRoutes.route("/api/Utilities/SendEmail").post(async function (req, res) {
   emailBody += `<p>Message: </p>`;
   emailBody += `<p>${req.body.message}</p>`;
     
-  await SendEmail(emailBody);
+  try {
+    await sendEmail(emailBody);    
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({message: 'Failed to send email'});
+  }
 
   res.json({ response: "Email sent sucessful!" });
 });
@@ -40,40 +38,40 @@ utilityRoutes.route("/api/Utilities/SendFeedbackForm").post(async function (req,
   emailBody += "<p>Which of the issues below was the biggest problem during your experience? " + req.body.issue + "</p>";
   emailBody += "<p>Please describe the problem you encountered in more detail: " + req.body.issueDetails + "</p>";
   emailBody += "<p>Do you have any suggestions for improvement? " + req.body.improvement + "</p>";
-    
-  await SendEmail(emailBody);
+  
+  try {
+    await sendEmail(emailBody);    
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({message: 'Failed to send email'});
+  }
 
   res.json({ response: "Email sent sucessful!" });
 });
 
-async function SendEmail(emailBody) {
-  let password = process.env.EmailPassword;
-
-  let transporter = nodemailer.createTransport({
-    host: smtpAddress,
-    port: portNumber,
-    secure: true, // true for 465, false for other ports
-    requireTLS: enableTLS,
+async function sendEmail(emailBody) {
+  const accessToken = await oAuth2Client.getAccessToken();
+  const transport = nodemailer.createTransport({
+    service: 'gmail',
     auth: {
-      user: emailFromAddress,
-      pass: password,
-    },
+      type: 'OAuth2',
+      user: 'dinamoteam01@gmail.com',
+      clientId: GMAIL_CLIENT_ID,
+      clientSecret: GMAIL_CLIENT_SECRET,
+      refreshToken: GMAIL_REFRESH_TOKEN,
+      accessToken: accessToken
+    }
   });
-  transporter.use('compile', htmlToText());
 
-  try {
-    let info = await transporter.sendMail({
-      from: emailFromAddress,
-      // to: "gtt27@drexel.edu, atran33@mylangara.ca", // list of receivers
-      to: "user7@mailinator.com", // list of receivers
-      subject: "Message from Code Spot", // Subject line
-      html: emailBody,
-    });
-  
-    console.log("Message sent: %s", info.messageId);
-  } catch(ex) {
-    console.log(`Error: ${ex}`);
-  }
+  const mailOptions = {
+    from: 'dinamoteam01@gmail.com',
+    to: 'gtt27@drexel.edu, amt23@sfu.ca',
+    subject: 'Message from Code Spot',
+    html: emailBody
+  };
+
+  let info = await transport.sendMail(mailOptions);
+  console.log("Message sent: %s", info.messageId);
 }
 
 module.exports = utilityRoutes;
