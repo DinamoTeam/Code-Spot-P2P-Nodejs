@@ -13,14 +13,16 @@ We also published an article on building a real-time collaborative code editor. 
 
 1. Make sure you have Node.js and npm installed: https://nodejs.org/en/ (npm comes with Node.js)
 
-2. Open a terminal to install server dependencies and start server
+2. Go to `.\code-spot-client\src\environments\environment.ts` and change `apiUrl` to `http://localhost:5000/api/`
+
+3. Open a terminal to install server dependencies and start server
 ```shell
 cd ./server
 npm install
 npm run start
 ```
 
-3. Open another terminal to install client dependencies and start client
+4. Open another terminal to install client dependencies and start client
 ```shell
 cd ./code-spot-client
 npm install
