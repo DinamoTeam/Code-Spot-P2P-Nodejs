@@ -6,10 +6,9 @@ export const environment = {
   production: false,
   // apiUrl: 'http://localhost:5000/api/',
   apiUrl: 'https://code-spot.vercel.app/api/',
-  peerServerHost: 'codespotpeerserver.herokuapp.com/',
+  peerServerHost: 'code-spot-peer-server.onrender.com/',
   connection: 'https://code-spot.vercel.app'
 };
-
 /*
  * For easier debugging in development mode, you can import the following file
  * to ignore zone related error stack frames such as `zone.run`, `zoneDelegate.invokeTask`.
