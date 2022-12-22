@@ -122,7 +122,7 @@ roomsRoutes.route("/api/Room/MarkPeerReceivedAllMessages").post(async function (
 });
 
 // Delete: api/Room/DeletePeer/abc
-roomsRoutes.route("/api/Room/DeletePeer/:peerId").post(async function (req, res) {
+roomsRoutes.route("/api/Room/DeletePeer/:peerId").delete(async function (req, res) {
     try {
         const peerId = req.params.peerId;
         const peer = await peerRepo.findByPeerId(peerId);

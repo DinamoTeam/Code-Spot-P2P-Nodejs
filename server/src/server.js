@@ -17,12 +17,12 @@ app.use(require("./routes/utilities"));
 app.use(require("./routes/turnservertoken"));
 app.use(require("./routes/rooms"));
 
-app.use(express.static(path.resolve(path.join(__dirname, "../../code-spot-client/dist/client"))))
+app.use(express.static(path.resolve(path.join(__dirname, '..', '..', 'code-spot-client', 'dist', 'client'))));
 app.get('*', (req, res) => {
   const filePath = path.resolve(
       __dirname,
       '..',
-      '../',
+      '..',
       'code-spot-client',
       'dist',
       'client',
@@ -30,6 +30,7 @@ app.get('*', (req, res) => {
   );
   res.sendFile(filePath);
 });
+
 (async () => { 
   await connectToDb();
   app.listen(port, async () => {
