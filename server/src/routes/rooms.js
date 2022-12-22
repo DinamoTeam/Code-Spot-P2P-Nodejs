@@ -82,12 +82,13 @@ roomsRoutes.route("/api/Room/JoinExistingRoom").get(async function (req, res) {
     const hasReceivedAllMessagesList = peers.map(peer => peer.hasReceivedAllMessages);
     const cursorColorList = peers.map(peer => peer.cursorColor);
 
-    const randomColor = getAvailableCursorColor(roomName);
-    await db_connect.collection("rooms").insertOne({
+    const randomColor = await getAvailableCursorColor(roomName);
+    console.log(randomColor);
+    await db_connect.collection("peers").insertOne({
         peerId,
         roomName,
         hasReceivedAllMessages: 0,
-        randomColor,
+        cursorColor: randomColor,
     });
     const info = {
         siteId: siteId++,
@@ -186,7 +187,7 @@ async function getAvailableCursorColor(roomName) {
 }
 
 function getRandom(min, max) {
-    return Math.random() * (max - min) + min;
+    return Math.floor(Math.random() * (max - min)) + min;
 }
 
 async function dbConnection() {
