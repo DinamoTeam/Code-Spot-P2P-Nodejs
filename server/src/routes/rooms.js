@@ -1,185 +1,155 @@
 const express = require("express");
 const roomsRoutes = express.Router();
-const dbo = require("../db/conn");
-const ObjectId = require("mongodb").ObjectId;
 const { v4: uuidv4 } = require('uuid');
-
-let siteId = 1;
+const roomRepo = require('../repositories/RoomRepo'); 
+const peerRepo = require('../repositories/PeerRepo');
+const siteIdRepo = require('../repositories/SiteIdRepo');
 
 // GET: api/Room/GetPeerIdsInRoom?roomName=abc
 roomsRoutes.route("/api/Room/GetPeerIdsInRoom").get(async function (req, res) {
-    await dbConnection();
-    const roomName = req.query.roomName;
-    const isRoomExist = await roomExist(roomName);
+    try {
+        const roomName = req.query.roomName;
+        const isRoomExist = !!(await roomRepo.findByName(roomName));
 
-    if (!isRoomExist) {
-        return res.json({});
+        if (!isRoomExist) {
+            return res.json({});
+        }
+
+        const peers = await peerRepo.findByRoomName(roomName);
+        const peerIds = peers.map(peer => peer.peerId);
+        res.json({ peerIds });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({errorMessage: 'Something went wrong with the server'});
     }
-
-    let db_connect = dbo.getDb();
-    const query = { roomName };
-    const peers = await db_connect
-        .collection("peers").find(query).toArray();
-
-    const peerIds = peers.map(peer => peer.peerId);
-
-    res.json({ peerIds });
 });
 
 // GET: api/Room/JoinNewRoom?peerId=abc
 roomsRoutes.route("/api/Room/JoinNewRoom").get(async function (req, res) {
-    await dbConnection();
-    const peerId = req.query.peerId;
-    const roomName = await generateRoomName();
-    const cursorColor = getRandom(1, 25) + 1;
+    try {
+        const peerId = req.query.peerId;
+        const roomName = uuidv4();
+        const cursorColor = getRandom(1, 25) + 1;
 
-    let db_connect = dbo.getDb();
+        await roomRepo.insert(roomName);
+        await peerRepo.insert({
+            peerId,
+            roomName,
+            hasReceivedAllMessages: 1,
+            cursorColor,
+        })
 
-    await db_connect.collection("rooms").insertOne({ roomName });
-    await db_connect.collection("peers").insertOne({
-        peerId,
-        roomName,
-        hasReceivedAllMessages: 1,
-        cursorColor,
-    });
-    const info = {
-        siteId: siteId++,
-        roomName,
-        cursorColor,
-        peerIds: [],
-        hasReceivedAllMessages: [],
-        cursorColors: [],
-    };
+        const siteId = await siteIdRepo.getCurrentSiteIdAndIncrement();
 
-    return res.json(info);
+        const info = {
+            siteId: siteId.siteId,
+            roomName,
+            cursorColor,
+            peerIds: [],
+            hasReceivedAllMessages: [],
+            cursorColors: [],
+        };
+
+        return res.json(info);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({errorMessage: 'Something went wrong with the server'});   
+    }
+    
 });
 
 // Get: api/Room/JoinExistingRoom?peerId=abc&roomName=def
 roomsRoutes.route("/api/Room/JoinExistingRoom").get(async function (req, res) {
-    await dbConnection();
-    const peerId = req.query.peerId;
-    const roomName = req.query.roomName;
-    const isRoomExist = await roomExist(roomName);
+    try {
+        const peerId = req.query.peerId;
+        const roomName = req.query.roomName;
+        const isRoomExist = !!(await roomRepo.findByName(roomName));
 
-    if (!isRoomExist) {
+        if (!isRoomExist) {
+            const info = {
+                siteId: -1,
+                roomName: null,
+                cursorColor: -1,
+                peerIds: null,
+                hasReceivedAllMessages: null,
+                cursorColors: null,
+            };
+
+            return res.json(info);
+        }
+
+        const peers = await peerRepo.findByRoomName(roomName);
+        const peerIds = peers.map(peer => peer.peerId);
+        const hasReceivedAllMessagesList = peers.map(peer => peer.hasReceivedAllMessages);
+        const cursorColorList = peers.map(peer => peer.cursorColor);
+
+        const randomColor = await getAvailableCursorColor(cursorColorList);
+        const siteId = await siteIdRepo.getCurrentSiteIdAndIncrement();
+
+        await peerRepo.insert({
+            peerId,
+            roomName,
+            hasReceivedAllMessages: 0,
+            cursorColor: randomColor,
+        });
+
         const info = {
-            siteId: -1,
-            roomName: null,
-            cursorColor: -1,
-            peerIds: null,
-            hasReceivedAllMessages: null,
-            cursorColors: null,
+            siteId: siteId.siteId,
+            roomName,
+            cursorColor: randomColor,
+            peerIds,
+            hasReceivedAllMessages: hasReceivedAllMessagesList,
+            cursorColors: cursorColorList,
         };
 
         return res.json(info);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({errorMessage: 'Something went wrong with the server'}); 
     }
-
-    let db_connect = dbo.getDb();
-    const query = { roomName };
-    const peers = await db_connect
-        .collection("peers").find(query).toArray();
-    const peerIds = peers.map(peer => peer.peerId);
-    const hasReceivedAllMessagesList = peers.map(peer => peer.hasReceivedAllMessages);
-    const cursorColorList = peers.map(peer => peer.cursorColor);
-
-    const randomColor = await getAvailableCursorColor(roomName);
-    console.log(randomColor);
-    await db_connect.collection("peers").insertOne({
-        peerId,
-        roomName,
-        hasReceivedAllMessages: 0,
-        cursorColor: randomColor,
-    });
-    const info = {
-        siteId: siteId++,
-        roomName,
-        cursorColor: randomColor,
-        peerIds,
-        hasReceivedAllMessages: hasReceivedAllMessagesList,
-        cursorColors: cursorColorList,
-    };
-
-    return res.json(info);
 });
 
 // Post: api/Room/MarkPeerReceivedAllMessages
 roomsRoutes.route("/api/Room/MarkPeerReceivedAllMessages").post(async function (req, res) {
-    await dbConnection();
-    const peerId = req.body.Val;
-    let db_connect = dbo.getDb();
-    const query = { peerId };
-    await db_connect
-        .collection("peers")
-        .updateOne(query, {
-            $set: {
-                hasReceivedAllMessages: 1
-            }
-        });
-    res.json({});
+    try {
+        const peerId = req.body.val;
+        await peerRepo.updateField(peerId, 'hasReceivedAllMessages', 1);
+        res.json({});
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({errorMessage: 'Something went wrong with the server'}); 
+    }
 });
 
 // Delete: api/Room/DeletePeer/abc
 roomsRoutes.route("/api/Room/DeletePeer/:peerId").post(async function (req, res) {
-    await dbConnection();
-    const peerId = req.params.peerId;
-    let db_connect = dbo.getDb();
-    let query = { peerId };
-    const peer = await db_connect
-        .collection("peers").findOne(query);
+    try {
+        const peerId = req.params.peerId;
+        const peer = await peerRepo.findByPeerId(peerId);
 
-    if (peer === null) {
-        return res.json({});
-    }
+        if (!peer) {
+            return res.json({});
+        }
 
-    query = { _id: peer._id };
-    await db_connect
-        .collection("peers").deleteOne(query);
-    query = { peerId };
-    const peers = await db_connect
-        .collection("peers").find(query).toArray();
-    const nobodyInRoom = peers.length === 0;
-    if (nobodyInRoom) {
-        query = { roomName: peer.roomName };
-        await db_connect
-            .collection("rooms").deleteOne(query);
+        await peerRepo.removeById(peer._id);
+        const peers = await peerRepo.findByRoomName(peer.roomName);
+        const nobodyInRoom = peers.length === 0;
+        if (nobodyInRoom) {
+            await roomRepo.remove(peer.roomName);
+        }
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({errorMessage: 'Something went wrong with the server'}); 
     }
 });
 
-async function roomExist(roomName) {
-    let db_connect = dbo.getDb();
-    const query = { roomName };
-
-    const room = await db_connect
-        .collection("rooms").findOne(query);
-
-    return room !== null;
-}
-
-async function generateRoomName() {
-    const randomName = uuidv4();
-
-    let db_connect = dbo.getDb();
-    const query = { roomName: randomName };
-    const room = await db_connect
-        .collection("rooms").findOne(query);
-
-    if (room === null) {
-        return randomName;
-    }
-}
-
-async function getAvailableCursorColor(roomName) {
-    let db_connect = dbo.getDb();
-    const query = { roomName };
-    const peers = await db_connect
-        .collection("peers").find(query).toArray();
-    const cursorColorList = peers.map(peer => peer.cursorColor);
+async function getAvailableCursorColor(chosenColors) {
     let randomColor = getRandom(1, 25) + 1;
-    if (cursorColorList.Count >= 25) {
+    if (chosenColors.length >= 25) {
         return randomColor;
     }
 
-    while (cursorColorList.includes(randomColor)) {
+    while (chosenColors.includes(randomColor)) {
         randomColor = getRandom(1, 25) + 1;
     }
 
@@ -190,11 +160,4 @@ function getRandom(min, max) {
     return Math.floor(Math.random() * (max - min)) + min;
 }
 
-async function dbConnection() {
-    await dbo.connectToServer(async function (err) {
-        if (err) {
-            console.log(err);
-        }
-    });
-}
 module.exports = roomsRoutes;

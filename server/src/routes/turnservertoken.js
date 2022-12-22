@@ -5,9 +5,14 @@ const client = require('twilio')(accountSid, authToken);
 const turnServerTokenRoutes = express.Router();
 
 turnServerTokenRoutes.route("/api/turnServerToken").get(async function(req, res) {
-    const token = await client.tokens.create();
+    try {
+        const token = await client.tokens.create();
+        res.json(token);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({errorMessage: 'Something went wrong with the server'});
+    }
 
-    res.json(token);    
 });
 
 module.exports = turnServerTokenRoutes;

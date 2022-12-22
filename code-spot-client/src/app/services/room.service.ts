@@ -74,7 +74,7 @@ export class RoomService {
     if (error.error instanceof ErrorEvent) {
       errorMessage = error.error.message;
     } else {
-      errorMessage = 'Error from serve!';
+      errorMessage = 'Error from server!';
     }
     window.alert(errorMessage);
     return throwError(error);
