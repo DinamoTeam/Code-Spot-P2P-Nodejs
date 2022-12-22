@@ -32,3 +32,10 @@ ng serve --open
 Navigate to http://localhost:4200/ (If it has not been done automatically). The app will automatically reload if you change any of the source files.
 
 Note: Email sending and Twilio TURN server only work in production server
+
+## **III. Deployment notes**
+Remember to rebuild the frontend if any frontend changes were made
+```
+cd frontend
+npm run build
+```
